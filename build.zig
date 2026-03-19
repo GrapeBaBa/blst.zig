@@ -45,6 +45,16 @@ pub fn build(b: *std.Build) !void {
     {
         lib.root_module.addCMacro("__BLST_NO_ASM__", "");
     }
+
+    // Zig's bundled clang does not automatically define __APPLE__ when compiling
+    // .S assembly files, even when the target OS is macOS. blst's assembly.S uses
+    // #ifdef __APPLE__ to select mach-o symbol variants for ARM64; without this
+    // define the mach-o symbols are never assembled, causing undefined-symbol
+    // linker errors on Apple Silicon.
+    if (target.result.os.tag == .macos) {
+        lib.root_module.addCMacro("__APPLE__", "1");
+    }
+
     lib.installHeader(upstream.path("bindings/blst.h"), "blst.h");
     lib.installHeader(upstream.path("bindings/blst_aux.h"), "blst_aux.h");
 
