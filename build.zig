@@ -8,15 +8,15 @@ pub fn build(b: *std.Build) !void {
 
     const upstream = b.dependency("blst", .{});
 
-    var c_flags = std.ArrayList([]const u8).init(b.allocator);
-    defer c_flags.deinit();
+    var c_flags = std.ArrayList([]const u8).empty;
+    defer c_flags.deinit(b.allocator);
 
-    try c_flags.append("-fno-builtin");
-    try c_flags.append("-Wno-unused-function");
-    try c_flags.append("-Wno-unused-command-line-argument");
+    try c_flags.append(b.allocator, "-fno-builtin");
+    try c_flags.append(b.allocator, "-Wno-unused-function");
+    try c_flags.append(b.allocator, "-Wno-unused-command-line-argument");
 
     if (target.result.cpu.arch == .x86_64) {
-        try c_flags.append("-mno-avx"); // avoid costly transitions
+        try c_flags.append(b.allocator, "-mno-avx"); // avoid costly transitions
     }
 
     const lib = b.addLibrary(.{
@@ -48,7 +48,7 @@ pub fn build(b: *std.Build) !void {
     lib.installHeader(upstream.path("bindings/blst.h"), "blst.h");
     lib.installHeader(upstream.path("bindings/blst_aux.h"), "blst_aux.h");
 
-    lib.addCSourceFiles(.{
+    lib.root_module.addCSourceFiles(.{
         .root = upstream.path(""),
         .files = &.{
             "src/server.c",
