@@ -33,7 +33,15 @@ pub fn build(b: *std.Build) !void {
     if (portable) {
         lib.root_module.addCMacro("__BLST_PORTABLE__", "");
     } else {
-        if (std.Target.x86.featureSetHas(target.result.cpu.features, .adx)) {
+        // Guard __ADX__ check to x86_64 only.
+        // std.Target.x86.featureSetHas on non-x86 cpu features is meaningless —
+        // the feature indices differ per-arch and may accidentally return true
+        // for unrelated ARM features, incorrectly defining __ADX__ and breaking
+        // symbol resolution (server.c then references ctx_* symbols that don't
+        // exist in the mach-o/elf ARM64 assembly).
+        if (target.result.cpu.arch == .x86_64 and
+            std.Target.x86.featureSetHas(target.result.cpu.features, .adx))
+        {
             lib.root_module.addCMacro("__ADX__", "");
         }
     }
@@ -44,16 +52,6 @@ pub fn build(b: *std.Build) !void {
         target.result.cpu.arch != .aarch64)
     {
         lib.root_module.addCMacro("__BLST_NO_ASM__", "");
-    }
-
-    // Zig's bundled clang does not automatically define __APPLE__ when compiling
-    // .S assembly files, even on a macOS target. blst's build/assembly.S uses
-    // #ifdef __APPLE__ to select the mach-o ARM64 symbol variants; without this
-    // flag the ELF branch is used instead and the mach-o symbols are missing,
-    // causing undefined-symbol linker errors on Apple Silicon.
-    // Note: must be in c_flags (passed to clang), not addCMacro (zig-only flags).
-    if (target.result.os.tag == .macos) {
-        try c_flags.append(b.allocator, "-D__APPLE__=1");
     }
 
     lib.installHeader(upstream.path("bindings/blst.h"), "blst.h");
